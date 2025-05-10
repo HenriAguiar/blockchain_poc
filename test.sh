@@ -23,22 +23,41 @@ echo "==> Forçando consenso em node3"
 curl -s http://localhost:5003/nodes/resolve
 echo -e "\n"
 
-# 5) Demonstração de bloco inválido em node1
-echo "==> Demonstrando cadeia inválida após adulteração em node1"
+# 5) Criar transações, minerar e adulterar em node1
+echo "==> Criando transações, minerando e adulterando cadeia em node1"
 docker exec -i poc-blockchain_node1_1 python3 - << 'PYCODE'
 import requests, json
 from app import Blockchain
 
-# 5.1) Busca a cadeia atual a partir do próprio nó
+blockchain = Blockchain()
+
+# 5.1) Criar duas transações via API
+tx1 = requests.post('http://localhost:5000/transactions/new', json={
+    'sender': 'Alice',
+    'recipient': 'Bob',
+    'amount': 50
+})
+tx2 = requests.post('http://localhost:5000/transactions/new', json={
+    'sender': 'Bob',
+    'recipient': 'Charlie',
+    'amount': 25
+})
+
+print("Transações criadas:", tx1.status_code, tx2.status_code)
+
+# 5.2) Minerar um novo bloco para incluir as transações
+mine = requests.get('http://localhost:5000/mine')
+print("Mineração:", mine.status_code)
+
+# 5.3) Buscar a cadeia atual
 data = requests.get('http://localhost:5000/chain').json()
 chain = data['chain']
 
-# 5.2) Adulteração: muda o valor da primeira transação do bloco de índice 2 (chain[1])
+# 5.4) Adulterar a primeira transação do bloco de índice 2 (chain[1])
 if len(chain) > 1 and chain[1]['transactions']:
     chain[1]['transactions'][0]['amount'] = 4242
 
-# 5.3) Valida a cadeia adulterada
-print(json.dumps({
-    "valid_chain": Blockchain().valid_chain(chain)
-}, ensure_ascii=False))
+# 5.5) Validar a cadeia adulterada
+valid = Blockchain().valid_chain(chain)
+print(json.dumps({"valid_chain": valid}, ensure_ascii=False))
 PYCODE
